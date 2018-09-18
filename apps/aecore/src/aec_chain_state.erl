@@ -821,6 +821,11 @@ apply_node_transactions(Node, Trees, ForkInfo, State) ->
             end
     end.
 
+find_predecessor_at_distance(Node, 0) ->
+    Node;
+find_predecessor_at_distance(Node, D) when is_integer(D), D > 0 ->
+    find_predecessor_at_height(db_find_node(prev_key_hash(Node)), D - 1).
+
 find_predecessor_at_height(Node, Height) ->
     case node_height(Node) of
         Height -> Node;
@@ -851,8 +856,7 @@ find_one_predecessor([N|Left], Node) ->
 %% generation is lifted, we need to do something more elaborate.
 
 grant_fees(Node, Trees, Delay, FraudStatus, State) ->
-    NewestBlockHeight = node_height(Node) - Delay + ?POF_REPORT_DELAY,
-    KeyNode4 = find_predecessor_at_height(Node, NewestBlockHeight),
+    KeyNode4 = find_predecessor_at_distance(Node, - Delay + ?POF_REPORT_DELAY),
     KeyNode3 = db_get_node(prev_key_hash(KeyNode4)),
     KeyNode2 = db_get_node(prev_key_hash(KeyNode3)),
     KeyNode1 = db_get_node(prev_key_hash(KeyNode2)),
