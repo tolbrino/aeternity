@@ -57,6 +57,10 @@
         , sophia_oracles_qfee__remote_contract_query_value_below_qfee_does_not_take_from_rich_oracle_thanks_to_contract_check__remote/1
         , sophia_oracles_qfee__inner_error_after_primop__remote/1
         , sophia_oracles_qfee__outer_error_after_primop__remote/1
+        , sophia_oracles_gas_ttl__oracle_registration/1
+        , sophia_oracles_gas_ttl__oracle_extension/1
+        , sophia_oracles_gas_ttl__query/1
+        , sophia_oracles_gas_ttl__response/1
         , sophia_maps/1
         , sophia_map_benchmark/1
         , sophia_variant_types/1
@@ -120,6 +124,7 @@ groups() ->
                                  {group, sophia_oracles_query_fee_happy_path_remote},
                                  {group, sophia_oracles_query_fee_unhappy_path},
                                  {group, sophia_oracles_query_fee_unhappy_path_remote},
+                                 {group, sophia_oracles_gas_ttl},
                                  sophia_maps,
                                  sophia_map_benchmark,
                                  sophia_variant_types,
@@ -170,6 +175,12 @@ groups() ->
        , sophia_oracles_qfee__remote_contract_query_value_below_qfee_does_not_take_from_rich_oracle_thanks_to_contract_check__remote
        , sophia_oracles_qfee__inner_error_after_primop__remote
        , sophia_oracles_qfee__outer_error_after_primop__remote
+       ]}
+    , {sophia_oracles_gas_ttl, [],
+       [ sophia_oracles_gas_ttl__oracle_registration
+       , sophia_oracles_gas_ttl__oracle_extension
+       , sophia_oracles_gas_ttl__query
+       , sophia_oracles_gas_ttl__response
        ]}
     , {store, [sequence], [ create_store
                           , update_store
@@ -1877,6 +1888,66 @@ sophia_oracles_qfee__outer_error_after_primop__remote(_Cfg) ->
     ?assertEqual(Bal(OracleAcc, S1)                       , Bal(OracleAcc, S2)),
     ?assertEqual(Bal(CallingCt, S1) + QueryTxValue        , Bal(CallingCt, S2)),
     ?assertEqual(Bal(OperatorAcc, S1)                     , Bal(OperatorAcc, S2)).
+
+%% Oracle gas TTL tests
+
+-record(oracles_gas_ttl_scenario,
+        {register_ttl :: ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(non_neg_integer())
+                       | ?CHAIN_ABSOLUTE_TTL_MEMORY_ENCODING(non_neg_integer()),
+         extend_ttl   :: ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(non_neg_integer()),
+         query_ttl    :: ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(non_neg_integer())
+                       | ?CHAIN_ABSOLUTE_TTL_MEMORY_ENCODING(non_neg_integer()),
+         respond_ttl  :: ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(non_neg_integer())}).
+sophia_oracles_gas_ttl__measure_gas_used(Sc, Height) ->
+    state(aect_test_utils:new_state()),
+    Caller = call(fun new_account/2, [1000000]),
+    Ct = call(fun create_contract/4, [Caller, oracles_gas, {}]),
+    QFee=1,
+    Args = {QFee,
+            Sc#oracles_gas_ttl_scenario.register_ttl,
+            Sc#oracles_gas_ttl_scenario.extend_ttl,
+            Sc#oracles_gas_ttl_scenario.query_ttl,
+            Sc#oracles_gas_ttl_scenario.respond_ttl,
+            _Signature=0},
+    Opts = #{height => Height,
+             return_gas_used => true,
+             gas_price => 0,
+             gas => 1234567890,
+             amount => QFee},
+    {_, GasUsed} = call(fun call_contract/7, [Caller, Ct, happyPathWithAllBuiltinsAtSameHeight, {tuple, []}, Args, Opts]),
+    GasUsed.
+
+%% Test that gas charged by oracle primop depends on TTL of state object.
+%% Test approach: run primop with low and high TTLs, then compare consumed gas. This proves that TTL-related gas computation kicks in without relying on absolute minimum value of gas used.
+sophia_oracles_gas_ttl__oracle_registration(_Cfg) ->
+    {Part, Whole} = aec_governance:state_gas_cost_per_block(oracle_registration),
+    ?assertMatch(X when X > 0, Whole), %% Hardcoded expectation on governance - for test readability.
+    ?assertMatch(X when X > 0, Part), %% Hardcoded expectation on governance - for test readability.
+    G = fun(Ttl) ->
+                sophia_oracles_gas_ttl__measure_gas_used(
+                  #oracles_gas_ttl_scenario{
+                     register_ttl = ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(Ttl),
+                     extend_ttl   = ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(1),
+                     query_ttl    = ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(1),
+                     respond_ttl  = ?CHAIN_RELATIVE_TTL_MEMORY_ENCODING(1)},
+                  1)
+        end,
+    ?assertEqual(Part + G(1), G(1 + Whole)),
+    ?assertEqual(Part + G(1 + Whole), G(1 + 2*Whole)),
+    %% TODO abs.
+    ok.
+
+sophia_oracles_gas_ttl__oracle_extension(_Cfg) ->
+    todo.
+
+sophia_oracles_gas_ttl__query(_Cfg) ->
+    %% TODO not only rel but also abs.
+    todo.
+
+sophia_oracles_gas_ttl__response(_Cfg) ->
+    todo.
+
+%% -- End oracle gas TTL tests --
 
 %% Testing map functions and primitives
 sophia_maps(_Cfg) ->
