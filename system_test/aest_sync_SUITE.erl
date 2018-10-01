@@ -531,9 +531,11 @@ net_split_recovery(Cfg) ->
     %% Mine Length blocks, this may take longer than ping interval
     %% if so, the chains should be in sync when it's done.
     TargetHeight2 = MinedHeight1 + Length,
-    %% Wait for extra blocks for resolving potential fork caused by nodes mining distinct blocks at the same time.
-    wait_for_value({height, 2 + TargetHeight2}, Nodes, (2 + Length) * ?MINING_TIMEOUT, Cfg),
-
+    wait_for_value({height, TargetHeight2}, Nodes, Length * ?MINING_TIMEOUT, Cfg),
+    %% Nodes may be on different forks caused by mining distinct
+    %% blocks at the same time.  Rely on blocks mined during the
+    %% following check to resolve such forks.
+    ?assertMatch(X when X > ?MINING_TIMEOUT, ping_interval()),
     %% Wait at least as long as the ping timer can take
     try_until(T0 + 2 * ping_interval(),
             fun() ->
@@ -585,10 +587,12 @@ net_split_recovery(Cfg) ->
     T1 = erlang:system_time(millisecond),
 
     TargetHeight4 = MinedHeight3 + Length,
-    %% Wait for extra blocks for resolving potential fork caused by nodes mining distinct blocks at the same time.
-    wait_for_value({height, 2 + TargetHeight4}, Nodes, (2 + Length) * ?MINING_TIMEOUT, Cfg),
+    wait_for_value({height, TargetHeight4}, Nodes, Length * ?MINING_TIMEOUT, Cfg),
+    %% Nodes may be on different forks caused by mining distinct
+    %% blocks at the same time.  Rely on blocks mined during the
+    %% following check to resolve such forks.
+    ?assertMatch(X when X > ?MINING_TIMEOUT, ping_interval()),
     ct:log("Ping interval set to ~p", [ping_interval()]),
-
     try_until(T1 + 2 * ping_interval(),
             fun() ->
               D1 = get_block(net1_node1, TargetHeight4),
