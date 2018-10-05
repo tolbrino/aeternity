@@ -660,6 +660,7 @@ workflows:
                 - env/dev1
                 - env/dev2
                 - master
+                - PT-160981547-performance-system-test-failure--check--perf-suite
 
       - deploy_api_docs:
           requires:
@@ -679,6 +680,7 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
 
       - test:
           requires:
@@ -688,6 +690,7 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
 
       - eunit:
           requires:
@@ -697,6 +700,7 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
             tags:
               only: /^v.*$/
 
@@ -708,6 +712,7 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
             tags:
               only: /^v.*$/
 
@@ -719,6 +724,7 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
             tags:
               only: /^v.*$/
 
@@ -730,11 +736,15 @@ workflows:
               ignore:
                 - env/dev1
                 - env/dev2
+                - PT-160981547-performance-system-test-failure--check--perf-suite
             tags:
               only: /^v.*$/
 
       - linux_package:
           filters:
+            branches:
+              ignore:
+                - PT-160981547-performance-system-test-failure--check--perf-suite
             tags:
               only: /^v.*$/
 
@@ -854,6 +864,11 @@ workflows:
               ignore: /.*/
             tags:
               only: /^v.*$/
+
+      - docker_system_tests:
+          filters:
+            branches:
+              only: PT-160981547-performance-system-test-failure--check--perf-suite
 
   chain_snapshots:
     triggers:
