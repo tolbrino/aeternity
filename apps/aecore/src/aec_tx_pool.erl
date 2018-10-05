@@ -163,7 +163,6 @@ peek(MaxN, Account) when is_integer(MaxN), MaxN >= 0; MaxN =:= infinity ->
 get_candidate(MaxGas, BlockHash) when is_integer(MaxGas), MaxGas > 0,
                                       is_binary(BlockHash) ->
     int_get_candidate(MaxGas, BlockHash, dbs()).
-    %% gen_server:call(?SERVER, {get_candidate, MaxGas, BlockHash}).
 
 %% It assumes that the persisted mempool has been updated.
 -spec top_change(binary(), binary()) -> ok.
