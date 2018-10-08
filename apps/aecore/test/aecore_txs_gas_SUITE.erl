@@ -41,8 +41,15 @@ init_per_suite(Config) ->
             <<"persist">> => false
         },
         <<"mining">> => #{
-            <<"micro_block_cycle">> => MicroBlockCycle
-        }
+            <<"expected_mine_rate">> => 180000,
+            <<"micro_block_cycle">> => MicroBlockCycle,
+            <<"cuckoo">> =>
+               #{ 
+                  <<"miner">> => 
+                      #{ <<"executable">> => <<"mean28s-generic">>,
+                         <<"extra_args">> => <<"">>,
+                         <<"node_bits">> => 28} 
+                }}
     },
     aecore_suite_utils:create_configs(Config1, DefCfg),
     aecore_suite_utils:make_multi(Config1),
@@ -75,9 +82,8 @@ gas(Config) ->
     TxsPerMB = aec_governance:block_gas_limit() div aec_governance:tx_gas(),
     ct:log("We can put ~p Txs in a micro block\n", [TxsPerMB]),
 
-
     %% Add a bunch of transactions...
-    Txs1 = add_spend_txs(N1, <<"greetings">>, 4000,  1),
+    Txs1 = add_spend_txs(N1, <<"greetings">>, 4000, 1),
     ExpectedMBs1 = (length(Txs1) div TxsPerMB) + 1,
     ct:log("filled pool with ~p transactions\n", [length(Txs1)]),    
 
@@ -87,7 +93,7 @@ gas(Config) ->
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 5),
 
     Txs2 = add_spend_txs(N1, <<"good stuff">>, 4000,  length(Txs1) + 1),
-    R1 = add_rubish_txs(N1, <<"rubish">>, 1, 1),
+    R1 = add_rubish_txs(N1, <<"rubish">>, 100, 1),
 
     ExpectedMBs2 = (length(Txs2) div TxsPerMB) + 1,
     ct:log("filled pool with ~p transactions and rubish\n", [length(Txs2) + length(R1)]), 
@@ -96,15 +102,20 @@ gas(Config) ->
     %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
     %% probably expected.
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 5),
-    Top = aec_blocks:height(rpc:call(N1, aec_chain, top_block, [])),
-
     ct:log("Explored ~p", [explorer(N1, 0)]),
+
+    Top = aec_blocks:height(rpc:call(N1, aec_chain, top_block, [])),
+    ct:log("Top reached ~p", [Top]),
 
     aecore_suite_utils:start_node(dev2, Config),
     N2 = aecore_suite_utils:node_name(dev2),
     aecore_suite_utils:connect(N2),
-    aecore_suite_utils:wait_for_height(N2, Top),
+    ct:log("Times measured ~p", [ aecore_suite_utils:times_in_epoch_log(dev1, Config, "building micro block")]),
 
+    aecore_suite_utils:wait_for_height(N2, min(Top, 100)),
+
+    timer:sleep(5000), %% Give lager time to write everything to file
+    ct:log("Times measured ~p", [ aecore_suite_utils:times_in_epoch_log(dev2, Config, "sync generation")]),
     
     ok.
 
