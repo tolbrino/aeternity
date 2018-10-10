@@ -201,7 +201,7 @@ add_call_contract_txs(Node, ContractId, CallData, N, NonceStart) ->
     [call_contract_tx(Node, ContractId, CallData, Nonce) || Nonce <- lists:seq(NonceStart, NonceStart + N - 1) ]. 
 
 contract_gas() ->
-    2000.
+    500.
 
 get_contract_object(Node, Contract) ->
     {ok, Info} = rpc:call(Node, aec_chain, get_contract, [Contract]),
@@ -244,7 +244,7 @@ call_contract_tx(Node, Contract, CallData, Nonce) ->
                                      , contract_id => ContractID
                                      , fee         => 1
                                      , amount      => 0
-                                     , gas         => 4*contract_gas()
+                                     , gas         => contract_gas()
                                      , gas_price   => 1
                                      , call_data   => CallData
                                      , ttl         => 10000
