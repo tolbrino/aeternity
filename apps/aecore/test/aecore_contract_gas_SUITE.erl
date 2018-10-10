@@ -90,35 +90,44 @@ gas(Config) ->
     ct:log("InitData ~p\n", [CallData]),
 
     %% Add a bunch of transactions...
-    {Tx, ContractId} = create_contract_tx(N1, Code, CallData, 1),
-    Txs0 = [Tx | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
+    {TxHash, ContractId} = create_contract_tx(N1, Code, CallData, 1),
+    Txs0 = [TxHash | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 2),
 
-    
+    ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
+    InitCall = contract_object(N1, TxHash),
+       
+    ct:log("Contract Init call ~p", [InitCall]),
 
-    %% ct:log("Gas used for create Tx", [Gas]), 
+
+    R1 = add_create_contract_txs(N1, Code, CallData, 400, 3),
+    {Txs1, Contracts} = lists:unzip(R1),
+    ExpectedMBs1 = (length(Txs1) div TxsPerMB) + 1,
+    %% {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 2),
+
+    %% ct:log("Contract Info ~p", [[ element(2, get_contract_object(N1, C)) || C<-Contracts]]),
 
     CallData2 = aect_sophia:create_call(ContractId, <<"main">>, <<"(5)">>),
     ct:log("CallData ~p\n", [CallData2]),
 
-    Txs1 = add_call_contract_txs(N1, ContractId, CallData2, 40, length(Txs0) + 1),
-    ExpectedMBs1 = (length(Txs1) div TxsPerMB) + 1,
-    ct:log("filled pool with ~p call contracts\n", [length(Txs1)]),
-
-    %% Mine a block with as many Txs as possible
-    %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
-    %% probably expected.
-    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 5),
-
-    Txs2 = add_spend_txs(N1, <<"good stuff">>, 4000,  length(Txs1) + length(Txs0) + 1),
-
+    Txs2 = add_call_contract_txs(N1, ContractId, CallData2, 400, length(Txs0) + length(Txs1) + 1),
     ExpectedMBs2 = (length(Txs2) div TxsPerMB) + 1,
-    ct:log("filled pool with ~p transactions and rubish\n", [length(Txs2)]), 
+    ct:log("filled pool with ~p call contracts\n", [length(Txs2)]),
 
-    %% Mine a block with as many Txs as possible
-    %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
-    %% probably expected.
-    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 5),
+    {ok, Blocks} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 2),
+
+    ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
+
+    CallResults = [ contract_object(N1, Tx) || Tx <- Txs2 ],
+    Hash = rpc:call(N1, aec_chain, top_block_hash, []),
+    ct:log("Contract Call ~p", [CallResults]),
+
+    Txs3 = add_spend_txs(N1, <<"good stuff">>, 400, length(Txs2) + length(Txs1) + length(Txs0) + 1),
+
+    ExpectedMBs3 = (length(Txs3) div TxsPerMB) + 1,
+    ct:log("filled pool with ~p transactions and rubish\n", [length(Txs3)]), 
+
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs3)], round(ExpectedMBs3 * 1.2) + 2),
     ct:log("Explored ~p", [explorer(N1, 0)]),
 
     Top = aec_blocks:height(rpc:call(N1, aec_chain, top_block, [])),
@@ -135,12 +144,22 @@ gas(Config) ->
     ok.
 
 
+contract_object(Node, EncodedTxHash) ->
+    {ok, Tx0Hash} = aec_base58c:safe_decode(tx_hash, EncodedTxHash),
+    {BlockHash, STx} = rpc:call(Node, aec_chain, find_tx_with_location, [Tx0Hash]),
+    {CB, CTx} = aetx:specialize_callback(aetx_sign:tx(STx)),
+    Contract  = CB:contract_pubkey(CTx),
+    CallId    = CB:call_id(CTx),
+    rpc:call(Node, aec_chain, get_contract_call, [Contract, CallId, BlockHash]).
+
+
 explorer(Node, N) ->
     case rpc:call(Node, aec_chain, get_generation_by_height, [N, forward]) of
         error -> %% end of chain reached
             [];
         {ok, #{micro_blocks := MBs}} ->
-            [{N, {txs, length(aec_blocks:txs(MB)), [ aec_block:gas(Tx) || MB <- MBs, Tx <- aec_blocks:txs(MB)]}} | explorer(Node, N + 1)]
+            Txs = [ {txs, length(aec_blocks:txs(MB))} || MB <- MBs ],
+            [{N, micros, length(MBs), Txs} | explorer(Node, N + 1)]
     end.
 
 pool_peek(Node) ->
@@ -183,6 +202,11 @@ add_call_contract_txs(Node, ContractId, CallData, N, NonceStart) ->
 
 contract_gas() ->
     2000.
+
+get_contract_object(Node, Contract) ->
+    {ok, Info} = rpc:call(Node, aec_chain, get_contract, [Contract]),
+    Info.
+
 
 create_contract_tx(Node, Code, CallData, Nonce) ->
     OwnerKey = maps:get(pubkey, patron()),
