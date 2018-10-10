@@ -87,19 +87,30 @@ gas(Config) ->
 
     Code     = compile_contract("contracts/identity.aes"),
     CallData = aect_sophia:create_call(Code, <<"init">>, <<"()">>),
+    ct:log("InitData ~p\n", [CallData]),
 
     %% Add a bunch of transactions...
-    R1 = add_create_contract_txs(N1, Code, CallData, 4000, 1),
-    {Txs1, ContractIds} = lists:unzip(R1),
+    {Tx, ContractId} = create_contract_tx(N1, Code, CallData, 1),
+    Txs0 = [Tx | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 2),
+
+    
+
+    %% ct:log("Gas used for create Tx", [Gas]), 
+
+    CallData2 = aect_sophia:create_call(ContractId, <<"main">>, <<"(5)">>),
+    ct:log("CallData ~p\n", [CallData2]),
+
+    Txs1 = add_call_contract_txs(N1, ContractId, CallData2, 40, length(Txs0) + 1),
     ExpectedMBs1 = (length(Txs1) div TxsPerMB) + 1,
-    ct:log("filled pool with ~p created contracts\n", [length(Txs1)]),
+    ct:log("filled pool with ~p call contracts\n", [length(Txs1)]),
 
     %% Mine a block with as many Txs as possible
     %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
     %% probably expected.
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 5),
 
-    Txs2 = add_spend_txs(N1, <<"good stuff">>, 4000,  length(Txs1) + 1),
+    Txs2 = add_spend_txs(N1, <<"good stuff">>, 4000,  length(Txs1) + length(Txs0) + 1),
 
     ExpectedMBs2 = (length(Txs2) div TxsPerMB) + 1,
     ct:log("filled pool with ~p transactions and rubish\n", [length(Txs2)]), 
@@ -118,9 +129,7 @@ gas(Config) ->
     aecore_suite_utils:connect(N2),
     ct:log("Times measured ~p", [ aecore_suite_utils:times_in_epoch_log(dev1, Config, "building micro block")]),
 
-    aecore_suite_utils:wait_for_height(N2, min(Top-1, 100)),
-
-    timer:sleep(5000), %% Give lager time to write everything to file
+    timer:sleep((ExpectedMBs1 + ExpectedMBs2) * 500), %% Give lager time to write everything to file
     ct:log("Times measured ~p", [ aecore_suite_utils:times_in_epoch_log(dev2, Config, "sync generation")]),
     
     ok.
@@ -131,7 +140,7 @@ explorer(Node, N) ->
         error -> %% end of chain reached
             [];
         {ok, #{micro_blocks := MBs}} ->
-            [{N, [ {txs,  length(aec_blocks:txs(MB))} || MB <- MBs]} | explorer(Node, N + 1)]
+            [{N, {txs, length(aec_blocks:txs(MB)), [ aec_block:gas(Tx) || MB <- MBs, Tx <- aec_blocks:txs(MB)]}} | explorer(Node, N + 1)]
     end.
 
 pool_peek(Node) ->
@@ -169,8 +178,11 @@ add_spend_tx(Node, Payload, Nonce, Sender, Recipient) ->
 add_create_contract_txs(Node, Code, CallData, N, NonceStart) ->
     [create_contract_tx(Node, Code, CallData, Nonce) || Nonce <- lists:seq(NonceStart, NonceStart + N - 1) ]. 
 
+add_call_contract_txs(Node, ContractId, CallData, N, NonceStart) ->
+    [call_contract_tx(Node, ContractId, CallData, Nonce) || Nonce <- lists:seq(NonceStart, NonceStart + N - 1) ]. 
+
 contract_gas() ->
-    200.
+    2000.
 
 create_contract_tx(Node, Code, CallData, Nonce) ->
     OwnerKey = maps:get(pubkey, patron()),
@@ -199,24 +211,23 @@ compile_contract(File) ->
     Contract = binary_to_list(ContractBin),
     aeso_compiler:from_string(Contract, [pp_icode]).
 
-call_contract_tx(Node, Contract, Function, Args, Fee, Nonce, TTL) ->
+call_contract_tx(Node, Contract, CallData, Nonce) ->
     Caller       = aec_id:create(account, maps:get(pubkey, patron())),
     ContractID   = aec_id:create(contract, Contract),
-    CallData     = aeso_abi:create_calldata(<<>>, Function, Args),
     {ok, CallTx} = aect_call_tx:new(#{ nonce       => Nonce
                                      , caller_id   => Caller
                                      , vm_version  => 1
                                      , contract_id => ContractID
-                                     , fee         => Fee
+                                     , fee         => 1
                                      , amount      => 0
-                                     , gas         => contract_gas()
+                                     , gas         => 4*contract_gas()
                                      , gas_price   => 1
                                      , call_data   => CallData
-                                     , ttl         => TTL
+                                     , ttl         => 10000
                                      }),
     CTx = aec_test_utils:sign_tx(CallTx, maps:get(privkey, patron())),
-    Res = rpc:call(Node, aec_tx_pool, push, [CTx]),
-    {Res, aec_base58c:encode(tx_hash, aetx_sign:hash(CTx))}.
+    ok = rpc:call(Node, aec_tx_pool, push, [CTx]),
+    aec_base58c:encode(tx_hash, aetx_sign:hash(CTx)).
 
 
 new_pubkey() ->
