@@ -73,6 +73,11 @@ end_per_testcase(_Case, Config) ->
     aecore_suite_utils:stop_node(dev2, Config),
     ok.
 
+balance(Node) ->
+    {value, Account} =  rpc:call(Node, aec_chain, get_account, [maps:get(pubkey, patron())]),
+    aec_accounts:balance(Account).
+
+
 %% ============================================================
 %% Test cases
 %% ============================================================
@@ -80,6 +85,8 @@ gas(Config) ->
     aecore_suite_utils:start_node(dev1, Config),
     N1 = aecore_suite_utils:node_name(dev1),
     aecore_suite_utils:connect(N1),
+
+    InitialBalance = balance(N1),
 
     %% do we have covernance for contract create tx and contract call tx?
     TxsPerMB = aec_governance:block_gas_limit() div (aec_governance:tx_base_gas() + contract_gas()),
@@ -92,17 +99,16 @@ gas(Config) ->
     %% Add a bunch of transactions...
     {TxHash, ContractId} = create_contract_tx(N1, Code, CallData, 1),
     {ok, _} = aecore_suite_utils:mine_blocks_until_tx_on_chain(N1, TxHash, 2),
+    ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
+    InitCall = contract_object(N1, TxHash),
 
-    ct:log("Account ~p", [rpc:call(N1, aec_chain, get_account, [maps:get(pubkey, patron())])]),
+    CostCreate = InitialBalance - balance(N1),
+    ct:log("Paid for create gas: ~p", [CostCreate - 1]), %% fee is always 1
 
     Txs0 = [TxHash | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 2),
-
-    ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
-    InitCall = contract_object(N1, TxHash),
-    ct:log("Account ~p", [rpc:call(N1, aec_chain, get_account, [maps:get(pubkey, patron())])]),
-
-    ct:log("Contract Init call ~p", [InitCall]),
+    CostSpend = InitialBalance - CostCreate - balance(N1),
+    ct:log("Paid for spend tx gas: ~p", [CostSpend - 1]), %% fee is always 1
 
     CallData2 = aect_sophia:create_call(ContractId, <<"spend">>, <<"2">>),
     ct:log("CallData ~p\n", [CallData2]),
@@ -113,7 +119,8 @@ gas(Config) ->
 
     {ok, Blocks} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 2),
 
-    ct:log("Account ~p", [rpc:call(N1, aec_chain, get_account, [maps:get(pubkey, patron())])]),
+    CostCall = InitialBalance - CostCreate - CostSpend - balance(N1),
+    ct:log("Paid for call gas: ~p", [CostCall - 1]),
 
     ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
 
