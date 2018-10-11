@@ -100,7 +100,8 @@ gas(Config) ->
     {TxHash, ContractId} = create_contract_tx(N1, Code, CallData, 1),
     {ok, _} = aecore_suite_utils:mine_blocks_until_tx_on_chain(N1, TxHash, 2),
     ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
-    InitCall = contract_object(N1, TxHash),
+    InitCall = contract_object(N1, TxHash),       
+    ct:log("Contract Init call ~p", [InitCall]),
 
     CostCreate = InitialBalance - balance(N1),
     ct:log("Paid for create gas: ~p", [CostCreate - 1]), %% fee is always 1
@@ -108,9 +109,9 @@ gas(Config) ->
     Txs0 = [TxHash | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
     {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 2),
     CostSpend = InitialBalance - CostCreate - balance(N1),
-    ct:log("Paid for spend tx gas: ~p", [CostSpend - 1]), %% fee is always 1
+    ct:log("Paid for spend tx gas: ~p", [CostSpend - 1 - 10]), %% fee is always 1, we spend 10
 
-    CallData2 = aect_sophia:create_call(ContractId, <<"spend">>, <<"2">>),
+    CallData2 = aect_sophia:create_call(ContractId, <<"spend">>, <<"100">>),
     ct:log("CallData ~p\n", [CallData2]),
 
     Txs2 = add_call_contract_txs(N1, ContractId, CallData2, 1, length(Txs0) + 1),
@@ -119,7 +120,7 @@ gas(Config) ->
 
     {ok, Blocks} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 2),
 
-    CostCall = InitialBalance - CostCreate - CostSpend - balance(N1),
+    CostCall = InitialBalance - CostCreate - CostSpend - balance(N1) + 20*100,
     ct:log("Paid for call gas: ~p", [CostCall - 1]),
 
     ct:log("Contract Info ~p", [get_contract_object(N1, ContractId)]),
