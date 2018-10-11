@@ -1,0 +1,31 @@
+
+contract SpendContract =
+
+  function spend(amount) =
+    let total = Contract.balance
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+    Chain.spend(Call.caller, amount)
+
+    total - 20 *amount
+
