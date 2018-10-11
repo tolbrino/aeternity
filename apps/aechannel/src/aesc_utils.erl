@@ -254,7 +254,7 @@ check_force_progress_(PayloadHash, PayloadRound,
           end,
           fun() -> validate_addresses(Addresses, PoI, Channel) end,
           fun() -> check_root_hash_of_poi(PayloadHash, PoI) end,
-          fun() -> % check produced tree has the same root hash as the poi 
+          fun() -> % check produced tree has the same root hash as the poi
               %% TODO: this might be a lot of work. Shall we consume gas?
               PoITrees = trees_from_poi(Addresses, PoI),
               PoICallsHash = aec_trees:poi_calls_hash(PoI),
@@ -502,7 +502,7 @@ process_force_progress(Tx, Addresses,
     Accs = aec_trees:accounts(PoITrees),
     GetBalance =
         fun(Pubkey) ->
-            Acc = aec_accounts_trees:get(Pubkey, Accs), 
+            Acc = aec_accounts_trees:get(Pubkey, Accs),
             aec_accounts:balance(Acc)
         end,
 
@@ -640,8 +640,8 @@ spend(From, Amount, Nonce, Trees) ->
                           aec_trees:trees()) -> aec_trees:trees().
 consume_gas_and_fee(Update, Call, Fee, From, Nonce, Trees) ->
     {_Amount, GasPrice, _GasLimit} = aesc_offchain_update:extract_amounts(Update),
-    GasCost = aect_call:gas_used(Call) * GasPrice,
-    spend(From, GasCost + Fee, Nonce, Trees).
+    UsedAmount = aect_call:gas_used(Call) * GasPrice,
+    spend(From, UsedAmount + Fee, Nonce, Trees).
 
 set_channel(Channel, Trees) ->
     ChannelsTree0 = aec_trees:channels(Trees),
