@@ -79,7 +79,7 @@ gas(Config) ->
     N1 = aecore_suite_utils:node_name(dev1),
     aecore_suite_utils:connect(N1),
 
-    TxsPerMB = aec_governance:block_gas_limit() div aec_governance:tx_gas(),
+    TxsPerMB = aec_governance:block_gas_limit() div aec_governance:tx_base_gas(),
     ct:log("We can put ~p Txs in a micro block\n", [TxsPerMB]),
 
     %% Add a bunch of transactions...
@@ -128,11 +128,6 @@ explorer(Node, N) ->
             [{N, [ {txs,  length(aec_blocks:txs(MB))} || MB <- MBs]} | explorer(Node, N + 1)]
     end.
 
-pool_peek(Node) ->
-    rpc:call(Node, sys, get_status, [aec_tx_pool_gc]),
-    rpc:call(Node, aec_tx_pool, peek, [infinity]).
-
-
 add_spend_txs(Node, Payload, N, NonceStart) ->
     From = patron(),
     To = new_pubkey(),
@@ -158,55 +153,6 @@ add_spend_tx(Node, Payload, Nonce, Sender, Recipient) ->
     STx = aec_test_utils:sign_tx(Tx, maps:get(privkey, Sender)),
     ok = rpc:call(Node, aec_tx_pool, push, [STx]),
     aec_base58c:encode(tx_hash, aetx_sign:hash(STx)).
-
-
-create_contract_tx(Node, Name, Args, Fee, Nonce, TTL) ->
-    OwnerKey = maps:get(pubkey, patron()),
-    Owner    = aec_id:create(account, OwnerKey),
-    Code     = compile_contract(lists:concat(["contracts/", Name, ".aes"])),
-    CallData = aect_sophia:create_call(Code, <<"init">>, Args),
-    {ok, CreateTx} = aect_create_tx:new(#{ nonce      => Nonce
-                                         , vm_version => 1
-                                         , code       => Code
-                                         , call_data  => CallData
-                                         , fee        => Fee
-                                         , deposit    => 0
-                                         , amount     => 0
-                                         , gas        => 100000
-                                         , owner_id   => Owner
-                                         , gas_price  => 1
-                                         , ttl        => TTL
-                                         }),
-    CTx = aec_test_utils:sign_tx(CreateTx, maps:get(privkey, patron())),
-    ok = rpc:call(Node, aec_tx_pool, push, [CTx]),
-    ContractKey = aect_contracts:compute_contract_pubkey(OwnerKey, Nonce),
-    aec_base58c:encode(tx_hash, aetx_sign:hash(CTx)), ContractKey.
-
-compile_contract(File) ->
-    CodeDir = code:lib_dir(aesophia, test),
-    FileName = filename:join(CodeDir, File),
-    {ok, ContractBin} = file:read_file(FileName),
-    Contract = binary_to_list(ContractBin),
-    aeso_compiler:from_string(Contract, [pp_icode]).
-
-call_contract_tx(Node, Contract, Function, Args, Fee, Nonce, TTL) ->
-    Caller       = aec_id:create(account, maps:get(pubkey, patron())),
-    ContractID   = aec_id:create(contract, Contract),
-    CallData     = aeso_abi:create_calldata(<<>>, Function, Args),
-    {ok, CallTx} = aect_call_tx:new(#{ nonce       => Nonce
-                                     , caller_id   => Caller
-                                     , vm_version  => 1
-                                     , contract_id => ContractID
-                                     , fee         => Fee
-                                     , amount      => 0
-                                     , gas         => 100000
-                                     , gas_price   => 1
-                                     , call_data   => CallData
-                                     , ttl         => TTL
-                                     }),
-    CTx = aec_test_utils:sign_tx(CallTx, maps:get(privkey, patron())),
-    Res = rpc:call(Node, aec_tx_pool, push, [CTx]),
-    {Res, aec_base58c:encode(tx_hash, aetx_sign:hash(CTx))}.
 
 
 new_pubkey() ->

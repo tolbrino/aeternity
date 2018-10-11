@@ -82,7 +82,7 @@ gas(Config) ->
     aecore_suite_utils:connect(N1),
 
     %% do we have covernance for contract create tx and contract call tx?
-    TxsPerMB = aec_governance:block_gas_limit() div (aec_governance:tx_gas() + contract_gas()),
+    TxsPerMB = aec_governance:block_gas_limit() div (aec_governance:tx_base_gas() + contract_gas()),
     ct:log("We can put ~p Txs in a micro block\n", [TxsPerMB]),
 
     Code     = compile_contract("contracts/identity.aes"),
@@ -100,17 +100,17 @@ gas(Config) ->
     ct:log("Contract Init call ~p", [InitCall]),
 
 
-    R1 = add_create_contract_txs(N1, Code, CallData, 400, 3),
+    R1 = add_create_contract_txs(N1, Code, CallData, 2000, 3),
     {Txs1, Contracts} = lists:unzip(R1),
     ExpectedMBs1 = (length(Txs1) div TxsPerMB) + 1,
-    %% {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 2),
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 2),
 
-    %% ct:log("Contract Info ~p", [[ element(2, get_contract_object(N1, C)) || C<-Contracts]]),
+    ct:log("Contract Info ~p", [[ element(2, get_contract_object(N1, C)) || C<-Contracts]]),
 
     CallData2 = aect_sophia:create_call(ContractId, <<"main">>, <<"(5)">>),
     ct:log("CallData ~p\n", [CallData2]),
 
-    Txs2 = add_call_contract_txs(N1, ContractId, CallData2, 400, length(Txs0) + length(Txs1) + 1),
+    Txs2 = add_call_contract_txs(N1, ContractId, CallData2, 2000, length(Txs0) + length(Txs1) + 1),
     ExpectedMBs2 = (length(Txs2) div TxsPerMB) + 1,
     ct:log("filled pool with ~p call contracts\n", [length(Txs2)]),
 
@@ -122,7 +122,7 @@ gas(Config) ->
     Hash = rpc:call(N1, aec_chain, top_block_hash, []),
     ct:log("Contract Call ~p", [CallResults]),
 
-    Txs3 = add_spend_txs(N1, <<"good stuff">>, 400, length(Txs2) + length(Txs1) + length(Txs0) + 1),
+    Txs3 = add_spend_txs(N1, <<"good stuff">>, 4000, length(Txs2) + length(Txs1) + length(Txs0) + 1),
 
     ExpectedMBs3 = (length(Txs3) div TxsPerMB) + 1,
     ct:log("filled pool with ~p transactions and rubish\n", [length(Txs3)]), 
