@@ -17,7 +17,7 @@ references:
   infrastructure_config: &infrastructure_config
     docker:
       - image: aeternity/infrastructure:160452874_ansible_vault
-        entrypoint: /infrastructure/docker-entrypoint.sh
+        # entrypoint: /infrastructure/docker-entrypoint.sh
     working_directory: ~/epoch
 
   machine_config: &machine_config
