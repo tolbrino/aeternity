@@ -734,6 +734,9 @@ workflows:
 
       - linux_package:
           filters:
+            branches:
+              ignore:
+                - env/dev1
             tags:
               only: /^v.*$/
 
@@ -768,8 +771,8 @@ workflows:
               only: master
 
       - deploy_dev1:
-          requires:
-            - linux_package
+          # requires:
+          #   - linux_package
           filters:
             branches:
               only: env/dev1
