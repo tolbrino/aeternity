@@ -18,7 +18,6 @@ references:
     docker:
       - image: aeternity/infrastructure:160452874_ansible_vault
         entrypoint: /infrastructure/docker-entrypoint.sh
-        command: []
     working_directory: ~/epoch
 
   machine_config: &machine_config
@@ -175,9 +174,7 @@ references:
         environment:
           PACKAGES_DIR: *packages_workspace
         command: |
-          export PACKAGE=${PACKAGE_TARBALL:?}
-          export DEPLOY_DB_VERSION=$(cat deployment/DB_VERSION)
-          cd /infrastructure && make deploy
+          echo 123
 
   upload_github_release_asset: &upload_github_release_asset
     run:
