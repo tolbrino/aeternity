@@ -107,7 +107,7 @@ gas(Config) ->
     ct:log("Paid for create gas: ~p", [CostCreate - 1]), %% fee is always 1
 
     Txs0 = [TxHash | add_spend_txs(N1, <<"good stuff">>, 1,  2) ],  %% We can add some Txs, need to wait contract on chain
-    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 2),
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs0)], 5),
     CostSpend = InitialBalance - CostCreate - balance(N1),
     ct:log("Paid for spend tx gas: ~p", [CostSpend - 1 - 10]), %% fee is always 1, we spend 10
 
@@ -202,7 +202,7 @@ add_call_contract_txs(Node, ContractId, CallData, N, NonceStart) ->
     [call_contract_tx(Node, ContractId, CallData, Nonce) || Nonce <- lists:seq(NonceStart, NonceStart + N - 1) ]. 
 
 contract_gas() ->
-    500000.
+    4000000.
 
 get_contract_object(Node, Contract) ->
     {ok, Info} = rpc:call(Node, aec_chain, get_contract, [Contract]),
@@ -218,7 +218,7 @@ create_contract_tx(Node, Code, CallData, Nonce) ->
                                          , call_data  => CallData
                                          , fee        => 1
                                          , deposit    => 9876
-                                         , amount     => 6789
+                                         , amount     => 100000
                                          , gas        => 500      %% 482 just now
                                          , owner_id   => Owner
                                          , gas_price  => 1
@@ -245,7 +245,7 @@ call_contract_tx(Node, Contract, CallData, Nonce) ->
                                      , contract_id => ContractID
                                      , fee         => 1
                                      , amount      => 0
-                                     , gas         => contract_gas()    %% 186527
+                                     , gas         => contract_gas()    %% 186527 for 20
                                      , gas_price   => 1
                                      , call_data   => CallData
                                      , ttl         => 10000

@@ -90,7 +90,7 @@ gas(Config) ->
     %% Mine a block with as many Txs as possible
     %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
     %% probably expected.
-    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 5),
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs1)], round(ExpectedMBs1 * 1.2) + 2),
 
     Txs2 = add_spend_txs(N1, <<"good stuff">>, 4000,  length(Txs1) + 1),
     R1 = add_rubish_txs(N1, <<"rubish">>, 100, 1),
@@ -101,7 +101,7 @@ gas(Config) ->
     %% Mine a block with as many Txs as possible
     %% Since we mine on top speed, we may change leader to ourself a number of times, creating more keyblocks than 
     %% probably expected.
-    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 5),
+    {ok, _} = aecore_suite_utils:mine_blocks_until_txs_on_chain(N1, [lists:last(Txs2)], round(ExpectedMBs2 * 1.2) + 2),
     ct:log("Explored ~p", [explorer(N1, 0)]),
 
     Top = aec_blocks:height(rpc:call(N1, aec_chain, top_block, [])),
@@ -114,7 +114,7 @@ gas(Config) ->
 
     aecore_suite_utils:wait_for_height(N2, min(Top, 100)),
 
-    timer:sleep(5000), %% Give lager time to write everything to file
+    timer:sleep(25000), %% Give lager time to write everything to file
     ct:log("Times measured ~p", [ aecore_suite_utils:times_in_epoch_log(dev2, Config, "sync generation")]),
     
     ok.
