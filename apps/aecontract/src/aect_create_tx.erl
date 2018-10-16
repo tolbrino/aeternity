@@ -179,9 +179,13 @@ check(#contract_create_tx{nonce      = Nonce,
                           gas_price  = GasPrice,
                           deposit    = Deposit,
                           fee = Fee} = Tx,
-      Trees,_Env) when ?is_non_neg_integer(GasPrice) ->
+      Trees, Env) when ?is_non_neg_integer(GasPrice) ->
     OwnerPubKey = owner_pubkey(Tx),
-    TotalAmount = Fee + Amount + Deposit + Gas * GasPrice,
+    TotalAmount =
+        case aetx_env:context(Env) of
+            aetx_transaction -> Fee + Amount + Deposit + Gas * GasPrice;
+            aetx_contract    -> Fee + Amount + Deposit
+        end,
     Checks =
         [fun() ->
                  aetx_utils:check_account(OwnerPubKey, Trees, Nonce, TotalAmount)
@@ -220,7 +224,9 @@ signers(#contract_create_tx{} = Tx, _) ->
 process(#contract_create_tx{owner_id   = OwnerId,
                             nonce      = Nonce,
                             amount     = Amount,
+                            gas        = Gas,
                             gas_price  = GasPrice,
+                            deposit    = Deposit,
                             fee        = Fee} = CreateTx,
         Trees0, Env) ->
     Height = aetx_env:height(Env),
@@ -230,9 +236,15 @@ process(#contract_create_tx{owner_id   = OwnerId,
     ContractId = aect_contracts:id(Contract),
     ContractPubKey  = aect_contracts:pubkey(Contract),
 
-    %% Charge the fee to the contract owner (caller)
+    %% Charge the fee, the gas (the unused portion will be refunded)
+    %% and the deposit (stored in the contract) to the contract owner (caller),
     %% and transfer the funds (amount) to the contract account.
-    Trees2 = spend(OwnerPubKey, ContractPubKey, Amount, Fee, Nonce,
+    Charges =
+        case aetx_env:context(Env) of
+            aetx_transaction -> Fee + Deposit + Gas * GasPrice;
+            aetx_contract    -> Fee + Deposit
+        end,
+    Trees2 = spend(OwnerPubKey, ContractPubKey, Amount, Charges, Nonce,
                    Trees1, Env),
 
     %% Create the init call.
@@ -317,11 +329,11 @@ run_contract(#contract_create_tx{ nonce      =_Nonce
 initialize_contract(#contract_create_tx{nonce      = Nonce,
                                         vm_version = VmVersion,
                                         amount     =_Amount,
-                                        gas        =_Gas,
+                                        gas        = Gas,
                                         gas_price  = GasPrice,
                                         deposit    = Deposit,
                                         fee   =_Fee} = Tx,
-                    ContractPubKey, Contract,
+                    _ContractPubKey, Contract,
                     CallRes, Trees, Env) ->
     OwnerPubKey = owner_pubkey(Tx),
 
@@ -330,11 +342,14 @@ initialize_contract(#contract_create_tx{nonce      = Nonce,
     %% Each block starts with an empty calls tree.
     Trees1 = aect_utils:insert_call_in_trees(CallRes, Trees),
 
-    %% Spend Gas and burn
-    %% Deposit (the deposit is stored in the contract.)
-    GasCost = aect_call:gas_used(CallRes) * GasPrice,
-    Trees2 = spend(OwnerPubKey, ContractPubKey, 0, Deposit+GasCost, Nonce,
-                   Trees1, Env),
+    %% Refund unused gas.
+    Trees2 =
+        case aetx_env:context(Env) of
+            aetx_transaction ->
+                aec_trees:set_accounts(Trees1, refund_unused_gas(OwnerPubKey, GasPrice, Gas, aect_call:gas_used(CallRes), aec_trees:accounts(Trees1)));
+            aetx_contract ->
+                Trees1
+        end,
 
     %% TODO: Move ABI specific code to abi module(s).
     Contract1 =
@@ -354,7 +369,11 @@ initialize_contract(#contract_create_tx{nonce      = Nonce,
     ContractsTree1 = aect_state_tree:enter_contract(Contract1, ContractsTree0),
     {ok, aec_trees:set_contracts(Trees2, ContractsTree1)}.
 
-
+refund_unused_gas(OwnerPubKey, GasPrice, ChargedGas, UsedGas, AccountsTree0) when UsedGas =< ChargedGas ->
+    Account0 = aec_accounts_trees:get(OwnerPubKey, AccountsTree0),
+    Refund = (ChargedGas - UsedGas) * GasPrice,
+    {ok, Account1} = aec_accounts:earn(Account0, Refund),
+    aec_accounts_trees:enter(Account1, AccountsTree0).
 
 
 serialize(#contract_create_tx{owner_id   = OwnerId,
