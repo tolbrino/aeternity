@@ -40,8 +40,7 @@ encode(id_hash, Payload) ->
     encode(id2type(IdType), Val);
 encode(Type, Payload) ->
     Pfx = type2pfx(Type),
-    Enc = base58_check(Payload),
-    <<Pfx/binary, "_", Enc/binary>>.
+    iolist_to_binary([Pfx, "_", base58_check(Payload)]).
 
 -spec decode(binary()) -> {known_type(), payload()}.
 decode(Bin0) ->
@@ -110,7 +109,7 @@ safe_decode(Type, Enc) ->
     end.
 
 decode_check(Bin) ->
-    Dec = base58_to_binary(Bin),
+    Dec = base58:base58_to_binary(binary_to_list(Bin)),
     Sz = byte_size(Dec),
     BSz = Sz - 4,
     <<Body:BSz/binary, C:4/binary>> = Dec,
@@ -120,7 +119,7 @@ decode_check(Bin) ->
 %% modified from github.com/mbrix/lib_hd
 base58_check(Bin) ->
     C = check_str(Bin),
-    binary_to_base58(iolist_to_binary([Bin, C])).
+    base58:binary_to_base58(iolist_to_binary([Bin, C])).
 
 split(Bin) ->
     binary:split(Bin, [<<"_">>], []).
@@ -212,12 +211,3 @@ byte_size_for_type(commitment)       -> 32;
 byte_size_for_type(peer_pubkey)      -> 32;
 byte_size_for_type(state)            -> 32;
 byte_size_for_type(poi)              -> not_applicable.
-
-
-%% TODO: Fix the base58 module so that it consistently uses binaries instead
-%%
-binary_to_base58(Bin) ->
-    iolist_to_binary(base58:binary_to_base58(Bin)).
-
-base58_to_binary(Bin) when is_binary(Bin) ->
-    base58:base58_to_binary(binary_to_list(Bin)).
