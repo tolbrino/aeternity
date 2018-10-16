@@ -11,3 +11,6 @@ contract SpendContract =
     else
        Chain.spend(Call.caller, amount)
        spend_loop(n-1, amount)
+
+  function idle() =
+    1
