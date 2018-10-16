@@ -92,8 +92,8 @@ block_mine_reward() ->
 block_gas_limit() ->
     application:get_env(aecore, block_gas_limit, ?BLOCK_GAS_LIMIT).
 
-tx_base_gas(contract_call_tx) -> 5 * ?TX_BASE_GAS;
-tx_base_gas(contract_create_tx) -> 4 * ?TX_BASE_GAS;
+tx_base_gas(contract_call_tx) ->  30 * ?TX_BASE_GAS;
+tx_base_gas(contract_create_tx) -> 10 * ?TX_BASE_GAS;
 tx_base_gas(spend_tx) -> ?TX_BASE_GAS;
 tx_base_gas(channel_deposit_tx) -> ?TX_BASE_GAS;
 tx_base_gas(channel_close_mutual_tx) -> ?TX_BASE_GAS;
@@ -160,7 +160,7 @@ state_gas_cost_per_block(oracle_response)     -> state_gas_cost_per_block(oracle
 %% calling contract create transaction or contract call transaction)
 %% at least the gas cost of the call instruction (e.g. `CALL`) used
 %% for calling the primop.
-primop_base_gas_cost(?PRIM_CALL_SPEND              ) -> 0;
+primop_base_gas_cost(?PRIM_CALL_SPEND              ) -> 12000;
 primop_base_gas_cost(?PRIM_CALL_ORACLE_REGISTER    ) -> 0;
 primop_base_gas_cost(?PRIM_CALL_ORACLE_QUERY       ) -> 0;
 primop_base_gas_cost(?PRIM_CALL_ORACLE_RESPOND     ) -> 0;
