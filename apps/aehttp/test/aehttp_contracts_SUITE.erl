@@ -1192,7 +1192,7 @@ contract_call_compute_tx(Pubkey, Privkey, Nonce, EncodedContractPubkey,
                               contract_id => EncodedContractPubkey,
                               vm_version => 1,  %?AEVM_01_Sophia_01
                               amount => 0,
-                              gas => 50000,     %May need a lot of gas
+                              gas => 100000,     %May need a lot of gas
                               gas_price => 1,
                               fee => 1,
                               nonce => Nonce,
