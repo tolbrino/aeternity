@@ -167,7 +167,9 @@ init_vm(State, Code, Mem, Store) ->
                     {ok, CalldataHeap} = aeso_data:binary_to_heap({tuple, [typerep, Type]}, Calldata,
                                                                   aevm_eeevm_maps:next_id(maps(State2)), HeapSize),
                     {Ptr, State3} = write_heap_value(CalldataHeap, State2),
-                    aevm_eeevm_stack:push(Ptr, State3);
+                    CallDataGasCost = aevm_gas:mem_cost(byte_size(Calldata) div 32),
+                    State4 = set_gas(maps:get(gas, State3) - CallDataGasCost, State3),
+                    aevm_eeevm_stack:push(Ptr, State4);
                 {error, Err} ->
                     io:format("** Error invalid calldata: ~p\n", [Err]),
                     set_gas(0, State2)
