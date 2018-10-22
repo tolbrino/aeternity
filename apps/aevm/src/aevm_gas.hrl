@@ -23,16 +23,16 @@
 -define(GEXTCODE, 700).
 
 %% Amount of gas to pay for operations of the set Wextcodesize.
--define(GEXTCODESIZE, 20). %% From go implementation
+-define(GEXTCODESIZE, ?GEXTCODE).
 
 %% Amount of gas to pay for operations of the set Wextcodecopy.
--define(GEXTCODECOPY, 20). %% From go implementation
+-define(GEXTCODECOPY, ?GEXTCODE).
 
 %% Amount of gas to pay for a BALANCE operation.
--define(GBALANCE, 20). %% From the go implementation. 400 in yellowpages
+-define(GBALANCE, 400).
 
 %% Paid for a SLOAD operation.
--define(GSLOAD, 50). %% From the go implementation. 200 in yellowpaper
+-define(GSLOAD, 200).
 
 %% Paid for a JUMPDEST operation.
 -define(GJUMPDEST, 1).
@@ -56,9 +56,6 @@
 %% Amount of gas to pay for a SELFDESTRUCT operation.
 -define(GSELFDESTRUCT, 5000).
 
-%% From the go implementation
-%% -define(GSUICIDE, 0).
-
 %% Paid for a CREATE operation.
 -define(GCREATE, 32000).
 
@@ -67,7 +64,7 @@
 -define(GCODEDEPOSIT, 200).
 
 %% Paid for a CALL operation.
--define(GCALL, 40). %% From the go implementation. 700 from the yellowpaper
+-define(GCALL, 700).
 
 %% Paid for a non-zero value transfer as part of the CALL operation.
 -define(GCALLVALUE, 9000).
@@ -84,7 +81,7 @@
 
 %% Partial payment when multiplied by dlog256(exponent)e for the EXP
 %% operation.
--define(GEXPBYTE, 10). %% From the go implementation. 50 from the yellowpages
+-define(GEXPBYTE, 50).
 
 %% Paid for every additional word when expanding memory.
 -define(GMEMORY, 3).
