@@ -4328,7 +4328,7 @@ force_call_contract_first_with_calldata(Forcer, CallData, Round) ->
            [set_height_to_forcable(),
             set_prop(round, Round - 1),
             set_from(Forcer),
-            create_poi_by_trees(),
+            create_fp_trees(),
             create_payload(),
             set_prop(round, Round),
             fun(#{contract_id := ContractId} = Props) ->
