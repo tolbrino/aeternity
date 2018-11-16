@@ -55,7 +55,7 @@ SWTEMP := $(shell mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
 all:	local-build
 
 console:
-	@./rebar3 shell --config config/dev.config --sname epoch
+	@./rebar3 as local shell --config config/dev.config --sname epoch
 
 local-build: KIND=local
 local-build: internal-build
@@ -173,6 +173,9 @@ test:
 		./rebar3 as test do release, ct $(CT_TEST_FLAGS) --sys_config config/test.config; \
 	fi
 
+REVISION:
+	@git rev-parse HEAD > $@
+
 eunit:
 	@ERL_FLAGS="-args_file $(EUNIT_VM_ARGS)" ./rebar3 do eunit $(EUNIT_TEST_FLAGS)
 
@@ -282,6 +285,7 @@ killall:
 
 clean:
 	@./rebar3 clean
+	@rm REVISION
 	( cd apps/aesophia/test/contracts && $(MAKE) clean; )
 	( cd $(HTTP_APP) && $(MAKE) clean; )
 	@$(MAKE) multi-distclean
@@ -317,6 +321,7 @@ internal-package: $$(KIND)
 	@./rebar3 as $(KIND) tar
 
 internal-build: $$(KIND)
+internal-build: REVISION
 	@./rebar3 as $(KIND) release
 
 internal-start: $$(KIND)
@@ -355,4 +360,5 @@ compile-aes:
 	swagger swagger-docs swagger-check swagger-version-check \
 	rebar-lock-check \
 	compile-aes\
-	python-env python-ws-test python-uats python-single-uat python-release-test
+	python-env python-ws-test python-uats python-single-uat python-release-test \
+	REVISION
