@@ -322,7 +322,7 @@ internal-package: REVISION
 	@./rebar3 as $(KIND) tar
 
 internal-build: $$(KIND)
-internal-build: REVISION
+internal-build: REVISION internal-compile-deps
 	@./rebar3 as $(KIND) swagger_endpoints
 	@./rebar3 as $(KIND) release
 
