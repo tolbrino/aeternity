@@ -323,6 +323,7 @@ internal-package: REVISION
 
 internal-build: $$(KIND)
 internal-build: REVISION
+	@./rebar3 as $(KIND) swagger_endpoints
 	@./rebar3 as $(KIND) release
 
 internal-start: $$(KIND)
