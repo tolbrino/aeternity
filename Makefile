@@ -285,7 +285,7 @@ killall:
 
 clean:
 	@./rebar3 clean
-	@rm REVISION
+	@-rm REVISION
 	( cd apps/aesophia/test/contracts && $(MAKE) clean; )
 	( cd $(HTTP_APP) && $(MAKE) clean; )
 	@$(MAKE) multi-distclean
