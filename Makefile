@@ -237,14 +237,17 @@ python-release-test: swagger
 SWAGGER_CODEGEN_CLI_V = 2.3.1
 SWAGGER_CODEGEN_CLI = swagger/swagger-codegen-cli-$(SWAGGER_CODEGEN_CLI_V).jar
 SWAGGER_CODEGEN = java -jar $(SWAGGER_CODEGEN_CLI)
+SWAGGER_ENDPOINTS_SPEC = apps/aeutils/src/endpoints.erl
 
-swagger: config/swagger.yaml $(SWAGGER_CODEGEN_CLI)
+$(SWAGGER_ENDPOINTS_SPEC):
+	./rebar3 swagger_endpoints
+
+swagger: config/swagger.yaml $(SWAGGER_CODEGEN_CLI) $(SWAGGER_ENDPOINTS_SPEC)
 	@$(SWAGGER_CODEGEN) generate -i $< -l erlang-server -o $(SWTEMP)
 	@echo "Swagger tempdir: $(SWTEMP)"
 	@( mkdir -p $(HTTP_APP)/priv && cp $(SWTEMP)/priv/swagger.json $(HTTP_APP)/priv/; )
 	@( cd $(HTTP_APP) && $(MAKE) updateswagger; )
 	@rm -fr $(SWTEMP)
-	@./rebar3 swagger_endpoints
 	@$(SWAGGER_CODEGEN) generate -i $< -l python -o $(SWTEMP)
 	@echo "Swagger python tempdir: $(SWTEMP)"
 	@cp -r $(SWTEMP)/swagger_client $(PYTHON_TESTS)
@@ -286,6 +289,7 @@ killall:
 clean:
 	@./rebar3 clean
 	@-rm REVISION
+	@-rm $(SWAGGER_ENDPOINTS_SPEC)
 	( cd apps/aesophia/test/contracts && $(MAKE) clean; )
 	( cd $(HTTP_APP) && $(MAKE) clean; )
 	@$(MAKE) multi-distclean
@@ -322,8 +326,7 @@ internal-package: REVISION
 	@./rebar3 as $(KIND) tar
 
 internal-build: $$(KIND)
-internal-build: REVISION internal-compile-deps
-	@./rebar3 as $(KIND) swagger_endpoints
+internal-build: REVISION internal-compile-deps $(SWAGGER_ENDPOINTS_SPEC)
 	@./rebar3 as $(KIND) release
 
 internal-start: $$(KIND)
