@@ -323,7 +323,7 @@ internal-compile-deps: $$(KIND)
 	@./rebar3 as $(KIND) compile --deps-only
 
 internal-package: $$(KIND)
-internal-package: REVISION
+internal-package: REVISION internal-compile-deps $(SWAGGER_ENDPOINTS_SPEC)
 	@./rebar3 as $(KIND) tar
 
 internal-build: $$(KIND)
