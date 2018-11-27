@@ -165,12 +165,13 @@ dialyzer-install:
 dialyzer:
 	@./rebar3 dialyzer
 
-test:
+ct: KIND=test
+ct: internal-build
 	@EPOCH_PROCESSES="$$(ps -fea | grep bin/epoch | grep -v grep)"; \
 	if [ $$(printf "%b" "$${EPOCH_PROCESSES}" | wc -l) -gt 0 ] ; then \
 		(printf "%b\n%b\n" "Failed testing: another Epoch node is already running" "$${EPOCH_PROCESSES}" >&2; exit 1);\
 	else \
-		./rebar3 as test do release, ct $(CT_TEST_FLAGS) --sys_config config/test.config; \
+		./rebar3 ct $(CT_TEST_FLAGS) --sys_config config/test.config; \
 	fi
 
 REVISION:
