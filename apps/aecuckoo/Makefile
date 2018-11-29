@@ -25,8 +25,8 @@ BLAKE_2B_SRC ?= ../crypto/blake2b-ref.c
 
 # end Flags from upstream
 
-REPO = https://github.com/aeternity/cuckoo.git
-COMMIT = a66b88ab8514b7232b1e148a4760f9258d5457f0
+REPO = https://github.com/skarlsson/cuckoo.git
+COMMIT = 60450abec52a12020d006cc93a0cb2e1255fd704
 
 .PHONY: all
 all: $(EXECUTABLES)
@@ -98,4 +98,3 @@ $(PRIV):
 # does not leave working directory distinct from the expected commit.
 c_src/.git:
 	git clone -n $(REPO) $(@D)
-

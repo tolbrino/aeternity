@@ -39,6 +39,7 @@
 -define(error(F, A), epoch_pow_cuckoo:error(F, A)).
 
 -record(state, {os_pid :: integer() | undefined,
+                port :: pid() | undefined,
                 buffer = [] :: string(),
                 target :: aec_pow:sci_int() | undefined,
                 parser :: output_parser_fun()}).
@@ -178,23 +179,12 @@ generate_int(Header, Target) ->
 
 generate_int(Header, Target, MinerBin, MinerExtraArgs) ->
     BinDir = aecuckoo:bin_dir(),
-    Cmd = lists:concat(["./", MinerBin,
-                        " -h ", Header, " ", MinerExtraArgs]),
-    ?info("Executing cmd: ~p", [Cmd]),
     Old = process_flag(trap_exit, true),
-    DefaultOptions = [{stdout, self()},
-                      {stderr, self()},
-                      {cd, BinDir},
-                      {env, [{"SHELL", "/bin/sh"}]},
-                      monitor],
-    Options =
-      case aeu_env:user_config([<<"mining">>, <<"cuckoo">>, <<"miner">>, <<"nice">>]) of
-          {ok, Niceness} -> DefaultOptions ++ [{nice, Niceness}];
-          undefined -> DefaultOptions
-      end,
-    try exec:run(Cmd, Options) of
-        {ok, _ErlPid, OsPid} ->
+    Args = ["-h", Header | string:tokens(MinerExtraArgs, " ")],
+    try exec_run(MinerBin, BinDir, Args) of
+        {ok, Port, OsPid} ->
             wait_for_result(#state{os_pid = OsPid,
+                                   port = Port,
                                    buffer = [],
                                    parser = fun parse_generation_result/2,
                                    target = Target})
@@ -365,30 +355,24 @@ pack_header_and_nonce(Hash, Nonce) when byte_size(Hash) == 32 ->
 %%------------------------------------------------------------------------------
 -spec wait_for_result(#state{}) -> {'ok', term()} | {'error', term()}.
 wait_for_result(#state{os_pid = OsPid,
+                       port = Port,
                        buffer = Buffer} = State) ->
     receive
-        {stdout, OsPid, Msg} ->
+        {Port, {data, Msg}} ->
             Str = binary_to_list(Msg),
             {Lines, NewBuffer} = handle_fragmented_lines(Str, Buffer),
             (State#state.parser)(Lines, State#state{buffer = NewBuffer});
-        {stderr, OsPid, Msg} ->
-            ?error("ERROR: ~s", [Msg]),
+        {Port, {exit_status, 0}} ->
             wait_for_result(State);
         {'EXIT',_From, shutdown} ->
             %% Someone is telling us to stop
             stop_execution(OsPid),
             exit(shutdown);
-        {'DOWN', OsPid, process, _, normal} ->
+        {'EXIT', Port, normal} ->
             %% Process ended but no value found
             {error, no_value};
-        {'DOWN', OsPid, process, _, Reason} ->
-            %% Abnormal termination
-            Reason2 = case Reason of
-                          {exit_status, ExStat} -> exec:status(ExStat);
-                          _                     -> Reason
-                      end,
-            ?error("OS process died: ~p", [Reason2]),
-            {error, {execution_failed, Reason2}}
+        _Other ->
+            wait_for_result(State)
     end.
 
 %%------------------------------------------------------------------------------
@@ -433,7 +417,7 @@ parse_generation_result([], State) ->
     wait_for_result(State);
 parse_generation_result(["Solution" ++ ValuesStr | Rest], #state{os_pid = OsPid,
                                                                  target = Target} = State) ->
-    Soln = [list_to_integer(V, 16) || V <- string:tokens(ValuesStr, " ")],
+    Soln = [list_to_integer(string:trim(V, both, [$\r]), 16) || V <- string:tokens(ValuesStr, " ")],
     case test_target(Soln, Target) of
         true ->
             ?debug("Solution found: ~p", [Soln]),
@@ -445,7 +429,6 @@ parse_generation_result(["Solution" ++ ValuesStr | Rest], #state{os_pid = OsPid,
             parse_generation_result(Rest, State)
     end;
 parse_generation_result([Msg | T], State) ->
-    ?debug("~s", [Msg]),
     parse_generation_result(T, State).
 
 %%------------------------------------------------------------------------------
@@ -455,7 +438,7 @@ parse_generation_result([Msg | T], State) ->
 %%------------------------------------------------------------------------------
 -spec stop_execution(integer()) -> ok.
 stop_execution(OsPid) ->
-    case exec:kill(OsPid, 9) of
+    case exec_kill(OsPid) of
         {error, Reason} ->
             ?debug("Failed to stop mining OS process ~p: ~p (may have already finished).",
                    [OsPid, Reason]);
@@ -481,6 +464,42 @@ get_node_size() ->
 -spec node_size(non_neg_integer()) -> non_neg_integer().
 node_size(EdgeBits) when is_integer(EdgeBits), EdgeBits > 31 -> 8;
 node_size(EdgeBits) when is_integer(EdgeBits), EdgeBits >  0 -> 4.
+
+exec_run(Cmd, Dir, Args) ->
+    PortSettings = [
+                    binary,
+                    exit_status,
+                    hide,
+                    in,
+                    overlapped_io,
+                    stderr_to_stdout,
+                    stream,
+                    {args, Args},
+                    {cd, Dir},
+                    use_stdio
+                   ],
+    PortName = {spawn_executable, os:find_executable(Cmd, Dir)},
+    Port = erlang:open_port(PortName, PortSettings),
+    {os_pid, OsPid} = erlang:port_info(Port, os_pid),
+    {ok, Port, OsPid}.
+
+exec_kill(OsPid) ->
+    case is_unix() of
+        true ->
+            os:cmd(io_lib:format("kill -9 ~p", [OsPid])),
+            ok;
+        false ->
+            os:cmd(io_lib:format("taskkill /PID ~p /T /F", [OsPid])),
+            ok
+    end.
+
+is_unix() ->
+    case erlang:system_info(system_architecture) of
+        "win32" ->
+            false;
+        _ ->
+            true
+    end.
 
 %%------------------------------------------------------------------------------
 %% White paper, section 9: rather than adjusting the nodes/edges ratio, a
