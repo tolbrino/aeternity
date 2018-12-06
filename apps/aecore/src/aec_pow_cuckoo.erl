@@ -176,14 +176,9 @@ generate_int(Hash, Nonce, Target) ->
 
 generate_int(Hash, Nonce, Target, MinerBin, MinerExtraArgs) ->
     BinDir = aecuckoo:bin_dir(),
-    Repeats = get_miner_repeats(),
-    Args = ["-h", Hash, "-n", Nonce, "-r", Repeats | string:tokens(MinerExtraArgs, " ")],
-    Cmd = lists:concat(["./", MinerBin,
-                        " -h ", Hash,
-                        " -n ", Nonce,
-                        " -r ", Repeats,
-                        " ", MinerExtraArgs]),
-    ?info("Executing cmd ~p with args ~p", [MinerBin, lists:join(Args, " ")]),
+    Repeats = integer_to_list(get_miner_repeats()),
+    Args = ["-h", Hash, "-n", integer_to_list(Nonce), "-r", Repeats | string:tokens(MinerExtraArgs, " ")],
+    ?info("Executing cmd '~s ~s'", [MinerBin, lists:concat(lists:join(" ", Args))]),
     Old = process_flag(trap_exit, true),
     try exec_run(MinerBin, BinDir, Args) of
         {ok, Port, OsPid} ->
@@ -445,7 +440,7 @@ parse_generation_result(["Solution" ++ NonceValuesStr | Rest], #state{os_pid = O
             ?debug("Failed to meet target (~p)", [Target]),
             parse_generation_result(Rest, State)
     end;
-parse_generation_result([Msg | T], State) ->
+parse_generation_result([_Msg | T], State) ->
     parse_generation_result(T, State).
 
 parse_nonce_str(S) ->
@@ -495,14 +490,13 @@ exec_run(Cmd, Dir, Args) ->
                     in,
                     overlapped_io,
                     stderr_to_stdout,
-                    stream,
                     {args, Args},
-                    {cd, Dir},
-                    use_stdio
+                    {cd, Dir}
                    ],
     PortName = {spawn_executable, os:find_executable(Cmd, Dir)},
     Port = erlang:open_port(PortName, PortSettings),
     {os_pid, OsPid} = erlang:port_info(Port, os_pid),
+    ?debug("External mining process started with OS pid ~p", [OsPid]),
     {ok, Port, OsPid}.
 
 exec_kill(OsPid) ->
