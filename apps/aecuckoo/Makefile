@@ -22,11 +22,12 @@ GPP_ARCH_FLAGS ?= -m64 -x c++
 FLAGS ?= -Wall -Wno-format -Wno-deprecated-declarations -D_POSIX_C_SOURCE=200112L $(OPT) -DPREFETCH -I. $(CPPFLAGS) -pthread
 GPP ?= g++ $(GPP_ARCH_FLAGS) -std=c++11 $(FLAGS)
 BLAKE_2B_SRC ?= ../crypto/blake2b-ref.c
+NVCC ?= nvcc -std=c++11
 
 # end Flags from upstream
 
-REPO = https://github.com/skarlsson/cuckoo.git
-COMMIT = 60450abec52a12020d006cc93a0cb2e1255fd704
+REPO = https://github.com/aeternity/cuckoo.git
+COMMIT = 58f2e7770d84397f24cdca095795bd12aa4227a0
 
 .PHONY: all
 all: $(EXECUTABLES)
@@ -85,10 +86,11 @@ $(CUCKOO)/mean29-avx2: $(HDRS) $(CUCKOO)/mean.hpp $(CUCKOO)/mean.cpp
 	(cd $(CUCKOO); $(GPP) -o $(@F) -DSAVEEDGES -mavx2 -DNSIPHASH=8 -DEDGEBITS=29 mean.cpp $(BLAKE_2B_SRC))
 
 $(CUCKOO)/lcuda29:	$(CUCKOO)/../crypto/siphash.cuh $(CUCKOO)/lean.cu
-	(cd $(CUCKOO); nvcc -o $(@F) -DEDGEBITS=29 -arch sm_35 lean.cu $(BLAKE_2B_SRC))
+	(cd $(CUCKOO); $(NVCC) -o $(@F) -DEDGEBITS=29 -arch sm_35 lean.cu $(BLAKE_2B_SRC))
 
 $(CUCKOO)/cuda29:		$(CUCKOO)/../crypto/siphash.cuh $(CUCKOO)/mean.cu
-	(cd $(CUCKOO); nvcc -o $(@F) -DEDGEBITS=29 -arch sm_35 mean.cu $(BLAKE_2B_SRC))
+	(cd $(CUCKOO); $(NVCC) -o $(@F) -DEDGEBITS=29 -arch sm_35 mean.cu $(BLAKE_2B_SRC))
+
 
 # Create the private dir
 $(PRIV):
