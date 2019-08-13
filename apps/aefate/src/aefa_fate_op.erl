@@ -119,7 +119,7 @@
         , aens_update/1
         , aens_transfer/5
         , aens_revoke/4
-        , ecrecover_secp256k1/5
+        , ecrecover_secp256k1/4
         , ecverify/5
         , ecverify_secp256k1/5
         , contract_to_address/3
@@ -1276,8 +1276,8 @@ delegation_signature_data(Type, {Pubkey, Hash}, Current) when Type =:= aens_clai
                                                               Type =:= aens_revoke ->
     {<<Pubkey/binary, Hash/binary, Current/binary>>, Pubkey}.
 
-ecrecover_secp256k1(Arg0, Arg1, Arg2, Arg3, ES) ->
-    ter_op(ecrecover_secp256k1, {Arg0, Arg1, Arg2, Arg3}, ES).
+ecrecover_secp256k1(Arg0, Arg1, Arg2, ES) ->
+    bin_op(ecrecover_secp256k1, {Arg0, Arg1, Arg2}, ES).
 
 ecverify(Arg0, Arg1, Arg2, Arg3, ES) ->
     ter_op(ecverify, {Arg0, Arg1, Arg2, Arg3}, ES).
