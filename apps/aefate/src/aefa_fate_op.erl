@@ -119,6 +119,7 @@
         , aens_update/1
         , aens_transfer/5
         , aens_revoke/4
+        , ecrecover_secp256k1/5
         , ecverify/5
         , ecverify_secp256k1/5
         , contract_to_address/3
@@ -1275,6 +1276,9 @@ delegation_signature_data(Type, {Pubkey, Hash}, Current) when Type =:= aens_clai
                                                               Type =:= aens_revoke ->
     {<<Pubkey/binary, Hash/binary, Current/binary>>, Pubkey}.
 
+ecrecover_secp256k1(Arg0, Arg1, Arg2, Arg3, ES) ->
+    ter_op(ecrecover_secp256k1, {Arg0, Arg1, Arg2, Arg3}, ES).
+
 ecverify(Arg0, Arg1, Arg2, Arg3, ES) ->
     ter_op(ecverify, {Arg0, Arg1, Arg2, Arg3}, ES).
 
@@ -1591,7 +1595,11 @@ op(bits_difference, A, B)
   when ?IS_FATE_BITS(A), ?IS_FATE_BITS(B) ->
     ?FATE_BITS(BitsA) = A,
     ?FATE_BITS(BitsB) = B,
-    ?FATE_BITS((BitsA band BitsB) bxor BitsA).
+    ?FATE_BITS((BitsA band BitsB) bxor BitsA);
+op(ecrecover_secp256k1, Msg, Sig) when ?IS_FATE_BYTES(32, Msg)
+                                     , ?IS_FATE_BYTES(64, Sig) ->
+    {?FATE_BYTES(Msg1), ?FATE_BYTES(Sig1)} = {Msg, Sig},
+    aeu_crypto:ecrecover(secp256k1, Msg1, Sig1).
 
 %% Terinay operations
 op(map_lookup_default, Map, Key, Default) when ?IS_FATE_MAP(Map),
